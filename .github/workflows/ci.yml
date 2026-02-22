@@ -1,0 +1,52 @@
+name: CI — Validate
+
+on:
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-bicep:
+    name: Validate Bicep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Bicep
+        run: az bicep lint --file infra/main.bicep
+
+      - name: Build Bicep (compile check)
+        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+
+  validate-site:
+    name: Validate Static Site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check index.html exists
+        run: test -f src/index.html
+
+      - name: Check staticwebapp.config.json exists
+        run: test -f src/staticwebapp.config.json
+
+      - name: Validate staticwebapp.config.json is valid JSON
+        run: python3 -c "import json; json.load(open('src/staticwebapp.config.json'))"
+
+      - name: Verify auth routes are blocked
+        run: |
+          python3 -c "
+          import json, sys
+          config = json.load(open('src/staticwebapp.config.json'))
+          routes = config.get('routes', [])
+          auth_blocked = any(
+              r.get('route') == '/.auth/*' and r.get('statusCode') == 404
+              for r in routes
+          )
+          if not auth_blocked:
+              print('ERROR: /.auth/* route is not blocked with 404')
+              sys.exit(1)
+          print('OK: /.auth/* route is blocked with 404')
+          "
