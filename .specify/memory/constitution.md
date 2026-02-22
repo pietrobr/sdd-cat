@@ -1,50 +1,110 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+  Sync Impact Report
+  ==================
+  Version change: N/A → 1.0.0 (initial ratification)
+  Modified principles: N/A (first version)
+  Added sections:
+    - Core Principles (5 principles)
+    - Technology Stack & Constraints
+    - Deployment & CI/CD Workflow
+    - Governance
+  Removed sections: N/A
+  Templates requiring updates:
+    - .specify/templates/plan-template.md ✅ compatible (no changes needed)
+    - .specify/templates/spec-template.md ✅ compatible (no changes needed)
+    - .specify/templates/tasks-template.md ✅ compatible (no changes needed)
+    - .specify/templates/checklist-template.md ✅ compatible (no changes needed)
+    - .specify/templates/agent-file-template.md ✅ compatible (no changes needed)
+  Follow-up TODOs: none
+-->
+
+# SDD-Cat Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Static-First
+Every page and asset MUST be a static resource (HTML, CSS, JavaScript,
+images). No server-side rendering, no backend APIs hosted by the project.
+Dynamic data (e.g., cat images) MUST be fetched client-side from public
+third-party APIs or served from static JSON files bundled at build time.
+Rationale: a static site minimizes attack surface, cost, and operational
+complexity on Azure Static Web Apps.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Infrastructure as Code (Idempotent & Testable)
+All Azure infrastructure MUST be defined declaratively in Bicep files
+stored in the repository. Deployments MUST be idempotent: running the
+same deployment twice MUST produce an identical resource state with no
+errors or side-effects. Infrastructure code MUST be validated before
+every deployment via `az bicep lint` and `az deployment group what-if`.
+CI pipelines MUST execute these validation steps as a mandatory gate
+before any actual deployment. Rationale: idempotency and pre-flight
+validation prevent configuration drift and reduce deployment failures.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Anonymous Access (NON-NEGOTIABLE)
+The application MUST NOT require any form of user authentication or
+authorization. Azure Static Web Apps built-in auth MUST be explicitly
+disabled or restricted so that all routes are publicly accessible
+without login. No identity provider integration, no login pages, no
+session management. Rationale: the app is a public cat gallery with no
+user-specific data.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Azure PaaS Only
+The application MUST be hosted exclusively on Azure Static Web Apps
+(PaaS). No virtual machines, no containers, no custom servers. All
+supporting resources (e.g., CDN, DNS) MUST use Azure managed services.
+Resource provisioning MUST go through Bicep templates (see Principle II).
+Rationale: PaaS reduces operational overhead and aligns with the
+static-first approach.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Simplicity & YAGNI
+Start with the minimal viable static site that displays cat images.
+No unnecessary abstractions, no premature optimization, no speculative
+features. Every addition MUST be justified by a concrete user story.
+Complexity MUST be explicitly justified in the implementation plan.
+Rationale: a small scope keeps delivery fast and quality high.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Technology Stack & Constraints
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- **Frontend**: HTML5, CSS3, vanilla JavaScript (or a lightweight
+  framework only if justified by a user story).
+- **Hosting**: Azure Static Web Apps (Free or Standard tier).
+- **IaC**: Azure Bicep, deployed via Azure CLI (`az deployment`).
+- **CI/CD**: GitHub Actions with the official Azure Static Web Apps
+  deploy action.
+- **Data source**: Public cat API (e.g., TheCatAPI) or static JSON
+  bundled at build time.
+- **Authentication**: Disabled. The `staticwebapp.config.json` MUST
+  include a route rule blocking the `/.auth/*` path to prevent
+  accidental auth enablement.
+- **Item size**: N/A (no database). If future features require
+  Cosmos DB, the 2 MB item limit MUST be respected per attached
+  Azure Cosmos DB instructions.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Deployment & CI/CD Workflow
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+1. **Pull Request** — triggers `az bicep lint` and
+   `az deployment group what-if` (dry-run). Build the static site
+   and run any front-end tests.
+2. **Merge to main** — triggers idempotent infrastructure deployment
+   (`az deployment group create`) followed by static site deployment
+   via the SWA GitHub Action.
+3. **Rollback** — re-run the previous successful deployment commit;
+   Bicep idempotency guarantees safe re-application.
+4. **Environment parity** — staging and production MUST use the same
+   Bicep templates with environment-specific parameter files.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all other development practices for the
+SDD-Cat project. All pull requests and code reviews MUST verify
+compliance with these principles. Amendments require:
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+1. A documented proposal describing the change and its rationale.
+2. An update to this file with incremented version per SemVer:
+   - MAJOR: principle removal or backward-incompatible redefinition.
+   - MINOR: new principle or materially expanded guidance.
+   - PATCH: clarifications, typo fixes, non-semantic refinements.
+3. Propagation check across all `.specify/templates/` files to ensure
+   consistency with updated principles.
+
+**Version**: 1.0.0 | **Ratified**: 2026-02-22 | **Last Amended**: 2026-02-22

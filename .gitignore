@@ -1,0 +1,28 @@
+# Dependencies & build outputs
+node_modules/
+dist/
+build/
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+# IDE
+.idea/
+*.suo
+*.user
+
+# Azure
+.azure/
+
+# Bicep compiled output (ARM JSON)
+infra/*.json
+!infra/parameters/*.json

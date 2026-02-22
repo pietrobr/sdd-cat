@@ -1,0 +1,60 @@
+name: CD — Deploy
+
+on:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-infra:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Lint Bicep
+        run: az bicep lint --file infra/main.bicep
+
+      - name: What-If (dry run)
+        run: |
+          az deployment group what-if \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --template-file infra/main.bicep \
+            --parameters infra/parameters/prod.bicepparam
+
+      - name: Deploy Infrastructure (idempotent)
+        run: |
+          az deployment group create \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --template-file infra/main.bicep \
+            --parameters infra/parameters/prod.bicepparam \
+            --name "sddcat-$(date +%Y%m%d%H%M%S)"
+
+  deploy-site:
+    name: Deploy Static Site
+    needs: deploy-infra
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: /src
+          output_location: ""
+          skip_app_build: true
